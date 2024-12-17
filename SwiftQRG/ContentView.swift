@@ -56,11 +56,6 @@ struct ContentView: View {
 		}
 		filter.setValue(data, forKey: "inputMessage")
 		
-		let foregroundCIColor = CIColor(color: UIColor(selectedForegroundColor))
-		let backgroundCIColor = CIColor(color: UIColor(selectedBackgroundColor))
-		filter.setValue(foregroundCIColor, forKey: "inputColor0")
-		filter.setValue(backgroundCIColor, forKey: "inputColor1")
-		
 		if let outputImage = filter.outputImage {
 			let transformedImage = outputImage.transformed(by: CGAffineTransform(scaleX: 10, y: 10))
 			if let cgImage = context.createCGImage(transformedImage, from: transformedImage.extent) {
@@ -72,6 +67,7 @@ struct ContentView: View {
 	func shuffleColor() {
 		let colors: [Color] = [.red, .green, .blue, .orange, .purple, .yellow]
 		selectedForegroundColor = colors.randomElement() ?? .black
+		generateQRCode(from: urlInput)
 	}
 	
 	func saveQRCodeManually() {
@@ -115,7 +111,7 @@ struct QRGeneratorTabView: View {
 					.frame(width: 250, height: 250)
 					.clipShape(RoundedRectangle(cornerRadius: rounded ? 20 : 0))
 			} else {
-				Text("QR Code")
+				Text("QR Code will appear here")
 					.font(.headline)
 			}
 			
@@ -129,11 +125,8 @@ struct QRGeneratorTabView: View {
 					shuffleColor: shuffleColor
 				)
 				
-				QRCodeCustomizationView(
-					rounded: $rounded
-				)
+				QRCodeCustomizationView(rounded: $rounded)
 			}
-			.padding(.top, 10)
 			
 			SaveButtonView(saveQRCodeManually: saveQRCodeManually)
 		}
@@ -156,15 +149,12 @@ struct QRCodeSettingsView: View {
 					selectedProtocol: $selectedProtocol,
 					generateQRCode: generateQRCode
 				)
+
 				URLInputTextField(
 					urlInput: $urlInput,
 					generateQRCode: generateQRCode
 				)
-//				PasteButton(
-//					selectedForegroundColor: $selectedForegroundColor,
-//					urlInput: $urlInput,
-//					generateQRCode: generateQRCode
-//				)
+
 				PasteButton(
 					selectedColor: $selectedBackgroundColor,
 					urlInput: $urlInput,
@@ -255,7 +245,7 @@ struct SavedQRCode: Identifiable, Codable {
 	var text: String
 	
 	var image: UIImage {
-		return UIImage(data: imageData) ?? UIImage()
+		UIImage(data: imageData) ?? UIImage()
 	}
 	
 	init(image: UIImage, text: String) {
@@ -263,6 +253,7 @@ struct SavedQRCode: Identifiable, Codable {
 		self.text = text
 	}
 }
+
 struct PasteButton: View {
 	@Binding var selectedColor: Color
 	@Binding var urlInput: String
