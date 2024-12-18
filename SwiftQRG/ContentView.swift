@@ -41,10 +41,14 @@ struct ContentView: View {
 				loadSavedQRCodes()
 			}
 			
-			SavedQRCodeTabView(savedQRCodes: $savedQRCodes, qrCodeImage: $qrCodeImage, urlInput: $urlInput)
-				.tabItem {
-					Label("Saved QR Codes", systemImage: "folder")
-				}
+			SavedQRCodeTabView(
+				savedQRCodes: $savedQRCodes,
+				qrCodeImage: $qrCodeImage,
+				urlInput: $urlInput
+			)
+			.tabItem {
+				Label("Saved QR Codes", systemImage: "folder")
+			}
 		}
 	}
 	
@@ -58,6 +62,7 @@ struct ContentView: View {
 		
 		if let outputImage = filter.outputImage {
 			let transformedImage = outputImage.transformed(by: CGAffineTransform(scaleX: 10, y: 10))
+				.colored(using: selectedForegroundColor, backgroundColor: selectedBackgroundColor)
 			if let cgImage = context.createCGImage(transformedImage, from: transformedImage.extent) {
 				qrCodeImage = UIImage(cgImage: cgImage)
 			}
@@ -65,8 +70,16 @@ struct ContentView: View {
 	}
 	
 	func shuffleColor() {
-		let colors: [Color] = [.red, .green, .blue, .orange, .purple, .yellow]
-		selectedForegroundColor = colors.randomElement() ?? .black
+		selectedForegroundColor = Color(
+			red: Double.random(in: 0...1),
+			green: Double.random(in: 0...1),
+			blue: Double.random(in: 0...1)
+		)
+		selectedBackgroundColor = Color(
+			red: Double.random(in: 0...1),
+			green: Double.random(in: 0...1),
+			blue: Double.random(in: 0...1)
+		)
 		generateQRCode(from: urlInput)
 	}
 	
@@ -122,7 +135,7 @@ struct QRGeneratorTabView: View {
 					selectedForegroundColor: $selectedForegroundColor,
 					selectedBackgroundColor: $selectedBackgroundColor,
 					generateQRCode: generateQRCode,
-					shuffleColor: shuffleColor
+					shuffleColors: shuffleColor
 				)
 				
 				QRCodeCustomizationView(rounded: $rounded)
@@ -140,26 +153,28 @@ struct QRCodeSettingsView: View {
 	@Binding var selectedBackgroundColor: Color
 	
 	var generateQRCode: (String) -> Void
-	var shuffleColor: () -> Void
+	var shuffleColors: () -> Void
 	
 	var body: some View {
 		VStack {
 			HStack {
-				ProtocolPicker(
-					selectedProtocol: $selectedProtocol,
-					generateQRCode: generateQRCode
-				)
-
-				URLInputTextField(
-					urlInput: $urlInput,
-					generateQRCode: generateQRCode
-				)
-
-				PasteButton(
-					selectedColor: $selectedBackgroundColor,
-					urlInput: $urlInput,
-					generateQRCode: generateQRCode
-				)
+				TextField("Enter a URL", text: $urlInput)
+					.onChange(of: urlInput) { _ in
+						shuffleColors()
+						generateQRCode(urlInput)
+					}
+					.textFieldStyle(RoundedBorderTextFieldStyle())
+				
+				Button(action: {
+					if let clipboardString = UIPasteboard.general.string {
+						urlInput = clipboardString
+						generateQRCode(clipboardString)
+					}
+				}) {
+					Image(systemName: "doc.on.clipboard")
+						.font(.title)
+						.foregroundColor(.blue)
+				}
 			}
 			
 			HStack {
@@ -174,8 +189,12 @@ struct QRCodeSettingsView: View {
 					}
 			}
 			
-			HStack {
-				ShuffleButton(selectedColor: $selectedForegroundColor, shuffleColor: shuffleColor)
+			Button(action: shuffleColors) {
+				Label("Shuffle Colors", systemImage: "shuffle")
+					.padding()
+					.background(Color.blue)
+					.foregroundColor(.white)
+					.cornerRadius(10)
 			}
 		}
 	}
@@ -189,7 +208,7 @@ struct QRCodeCustomizationView: View {
 			Text("Square").tag(false)
 			Text("Rounded").tag(true)
 		}
-		.pickerStyle(.segmented)
+		.pickerStyle(SegmentedPickerStyle())
 	}
 }
 
@@ -197,92 +216,8 @@ struct SaveButtonView: View {
 	var saveQRCodeManually: () -> Void
 	
 	var body: some View {
-		HStack {
-			Button(action: saveQRCodeManually) {
-				Text("Save QR")
-					.padding()
-					.background(Color.green)
-					.foregroundColor(.white)
-					.cornerRadius(10)
-			}
-		}
-		.padding(.top)
-	}
-}
-
-struct ProtocolPicker: View {
-	@Binding var selectedProtocol: String
-	var generateQRCode: (String) -> Void
-	
-	var body: some View {
-		Picker("", selection: $selectedProtocol) {
-			Text("HTTPS").tag("https")
-			Text("HTTP").tag("http")
-			Text("None").tag("")
-		}
-		.onChange(of: selectedProtocol) { _ in
-			generateQRCode(selectedProtocol)
-		}
-		.fixedSize()
-	}
-}
-
-struct URLInputTextField: View {
-	@Binding var urlInput: String
-	var generateQRCode: (String) -> Void
-	
-	var body: some View {
-		TextField("Enter a URL", text: $urlInput)
-			.onChange(of: urlInput) { _ in
-				generateQRCode(urlInput)
-			}
-	}
-}
-
-struct SavedQRCode: Identifiable, Codable {
-	var id = UUID()
-	var imageData: Data
-	var text: String
-	
-	var image: UIImage {
-		UIImage(data: imageData) ?? UIImage()
-	}
-	
-	init(image: UIImage, text: String) {
-		self.imageData = image.pngData() ?? Data()
-		self.text = text
-	}
-}
-
-struct PasteButton: View {
-	@Binding var selectedColor: Color
-	@Binding var urlInput: String
-	var generateQRCode: (String) -> Void
-	
-	var body: some View {
-		Button(action: {
-			if let clipboardString = UIPasteboard.general.string {
-				urlInput = clipboardString
-				generateQRCode(clipboardString)
-			}
-		}) {
-			Image(systemName: "doc.on.clipboard")
-				.font(.title)
-				.foregroundColor(selectedColor)
-		}
-	}
-}
-
-struct ShuffleButton: View {
-	@Binding var selectedColor: Color
-	var shuffleColor: () -> Void
-	
-	var body: some View {
-		Button(action: shuffleColor) {
-			Image(systemName: "shuffle")
-				.font(.title)
-				.foregroundColor(selectedColor)
-		}
+		Button("Save QR", action: saveQRCodeManually)
+			.buttonStyle(RoundedButtonStyle(backgroundColor: .green, foregroundColor: .white))
 	}
 }
 
@@ -325,27 +260,52 @@ struct SavedQRCodeTabView: View {
 				}
 			}
 			
-			ClearAllButton(savedQRCodes: $savedQRCodes)
+			Button("Clear All") {
+				savedQRCodes.removeAll()
+				UserDefaults.standard.removeObject(forKey: "SavedQRCodes")
+			}
+			.buttonStyle(RoundedButtonStyle(backgroundColor: .red, foregroundColor: .white))
 		}
 	}
 }
 
-struct ClearAllButton: View {
-	@Binding var savedQRCodes: [SavedQRCode]
+struct SavedQRCode: Identifiable, Codable {
+	var id = UUID()
+	var imageData: Data
+	var text: String
 	
-	var body: some View {
-		Button(action: clearAllQRCodes) {
-			Text("Clear All")
-				.padding()
-				.background(Color.red)
-				.foregroundColor(.white)
-				.cornerRadius(10)
-		}
+	var image: UIImage {
+		UIImage(data: imageData) ?? UIImage()
 	}
 	
-	func clearAllQRCodes() {
-		savedQRCodes.removeAll()
-		UserDefaults.standard.removeObject(forKey: "SavedQRCodes")
+	init(image: UIImage, text: String) {
+		self.imageData = image.pngData() ?? Data()
+		self.text = text
+	}
+}
+
+extension CIImage {
+	func colored(using foregroundColor: Color, backgroundColor: Color) -> CIImage {
+		let foregroundCIColor = CIColor(color: UIColor(foregroundColor))
+		let backgroundCIColor = CIColor(color: UIColor(backgroundColor))
+		return self.applyingFilter("CIFalseColor", parameters: [
+			"inputColor0": foregroundCIColor,
+			"inputColor1": backgroundCIColor
+		])
+	}
+}
+
+struct RoundedButtonStyle: ButtonStyle {
+	var backgroundColor: Color
+	var foregroundColor: Color
+	
+	func makeBody(configuration: Configuration) -> some View {
+		configuration.label
+			.padding()
+			.background(backgroundColor)
+			.foregroundColor(foregroundColor)
+			.cornerRadius(10)
+			.scaleEffect(configuration.isPressed ? 0.95 : 1.0)
 	}
 }
 
